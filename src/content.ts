@@ -11,136 +11,120 @@ import browser from "webextension-polyfill";
         } else if (msg.action === 'SCROLL_TO_REF') {
             scrollToRef(msg.id);
             return Promise.resolve({ success: true });
+        } else if (msg.action === 'TOGGLE_SUMMARY_WINDOW') {
+            toggleFloatingSummaryWindow();
+            return Promise.resolve({ success: true });
         }
     });
 
-    function initPopup() {
-        const article = document.querySelector('article');
-        if (!article) return;
+    let inlineSummaryContainer: HTMLElement | null = null;
+    let isSummarizing = false;
 
-        let isSummarizing = false;
+    const header = document.createElement('div');
 
-        function createSummarizeSection() {
-            const wrapper = document.createElement('div');
-            wrapper.style.margin = '24px 0';
-            wrapper.style.width = '100%';
-            wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    function toggleFloatingSummaryWindow() {
+        const target = document.querySelector('article') || document.querySelector('.article');
+        if (!target) return;
 
-            const btn = document.createElement('button');
-            btn.innerText = '💡 현재 문서 요약하기';
-            btn.style.display = 'block';
-            btn.style.margin = '0 auto';
-            btn.style.padding = '14px 24px';
-            btn.style.borderRadius = '50px';
-            btn.style.border = '1px solid #ddd';
-            btn.style.backgroundColor = '#fff';
-            btn.style.color = '#333';
-            btn.style.fontSize = '16px';
-            btn.style.fontWeight = 'bold';
-            btn.style.cursor = 'pointer';
-            btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-            btn.style.transition = 'all 0.2s ease';
-
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                btn.style.backgroundColor = '#333';
-                btn.style.color = '#eee';
-                btn.style.borderColor = '#555';
-            }
-
-            btn.onmouseover = () => btn.style.transform = 'translateY(-2px)';
-            btn.onmouseout = () => btn.style.transform = 'none';
-
-            const summaryBox = document.createElement('div');
-            summaryBox.style.display = 'none';
-            summaryBox.style.backgroundColor = '#fff';
-            summaryBox.style.border = '1px solid #ddd';
-            summaryBox.style.borderRadius = '12px';
-            summaryBox.style.padding = '20px';
-            summaryBox.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)';
-            summaryBox.style.color = '#333';
-            summaryBox.style.fontSize = '15px';
-            summaryBox.style.lineHeight = '1.6';
-
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                summaryBox.style.backgroundColor = '#2c2c2c';
-                summaryBox.style.borderColor = '#444';
-                summaryBox.style.color = '#eee';
-            }
-
-            wrapper.appendChild(btn);
-            wrapper.appendChild(summaryBox);
-
-            btn.addEventListener('click', async () => {
-                if (isSummarizing) return;
-
-                isSummarizing = true;
-                btn.style.display = 'none';
-                summaryBox.style.display = 'block';
-                summaryBox.innerHTML = '<em>요약 중...</em>';
-
-                const extracted = extractText();
-                if (!extracted || (Array.isArray(extracted) && extracted.length === 0)) {
-                    summaryBox.innerText = "요약할 텍스트를 찾을 수 없습니다.";
-                    isSummarizing = false;
-                    return;
-                }
-
-                const textContent = Array.isArray(extracted) ? extracted.join('\n\n') : (typeof extracted === 'string' ? extracted : JSON.stringify(extracted));
-
-                try {
-                    const response = await browser.runtime.sendMessage({ action: 'FETCH_SUMMARY', text: textContent });
-                    if (response && response.success) {
-                        summaryBox.innerHTML = '';
-                        renderTextToBox(response.summary, summaryBox);
-                    } else {
-                        summaryBox.innerHTML = `<strong>오류 발생:</strong><br>${response?.error || '알 수 없는 오류'}`;
-                    }
-                } catch (err: any) {
-                    summaryBox.innerHTML = `<strong>네트워크 오류:</strong><br>${err.message}`;
-                }
-
-                isSummarizing = false;
-            });
-
-            return wrapper;
+        if (inlineSummaryContainer) {
+            inlineSummaryContainer.remove();
+            inlineSummaryContainer = null;
+            return;
         }
 
-        const topSection = createSummarizeSection();
-        const bottomSection = createSummarizeSection();
+        inlineSummaryContainer = document.createElement('div');
+        inlineSummaryContainer.style.marginBottom = '2em';
+        inlineSummaryContainer.style.padding = '1em';
 
-        article.parentNode?.insertBefore(topSection, article);
-        article.parentNode?.insertBefore(bottomSection, article.nextSibling);
 
-        function renderTextToBox(markdown: string, box: HTMLElement) {
-            let html = markdown
-                .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/__(.*?)__/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/_(.*?)_/g, '<em>$1</em>')
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.fontWeight = 'bold';
+        header.style.marginBottom = '0.5em';
+        header.style.opacity = '0.7';
 
-            html = html.replace(/\[(os-ref-\d+)\]/g, '<a href="#" class="os-ref-link" data-ref="$1" style="color:#0066cc;text-decoration:none;font-size:0.9em;font-weight:bold;margin:0 2px;">[$1]</a>');
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.background = 'none';
+        closeBtn.style.border = 'none';
+        closeBtn.style.fontSize = 'inherit';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.color = 'inherit';
+        closeBtn.style.padding = '0';
+        closeBtn.style.lineHeight = '1';
+        closeBtn.onclick = () => {
+            if (inlineSummaryContainer) {
+                inlineSummaryContainer.remove();
+                inlineSummaryContainer = null;
+            }
+        };
 
-            box.innerHTML = `<div>${html}</div>`;
+        header.appendChild(closeBtn);
+        inlineSummaryContainer.appendChild(header);
 
-            box.querySelectorAll('.os-ref-link').forEach((link) => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const ref = (e.target as HTMLElement).getAttribute('data-ref');
-                    if (ref) {
-                        scrollToRef(ref);
-                    }
-                });
-            });
+        const contentBox = document.createElement('div');
+        inlineSummaryContainer.appendChild(contentBox);
+        contentBox.style.fontStyle = 'italic';
+
+        // Insert before the first child of the target, or directly into parent if target is strictly formatted
+        if (target.firstChild) {
+            target.insertBefore(inlineSummaryContainer, target.firstChild);
+        } else {
+            target.appendChild(inlineSummaryContainer);
         }
+
+        startSummarization(contentBox);
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initPopup);
-    } else {
-        initPopup();
+    async function startSummarization(contentBox: HTMLElement) {
+        if (isSummarizing) return;
+        isSummarizing = true;
+
+        header.innerText = '요약 중...';
+        contentBox.innerHTML = `
+            <div style="height: 1em; background: currentColor; opacity: 0.15; border-radius: 4px; margin-bottom: 0.6em; width: 100%;"></div>
+            <div style="height: 1em; background: currentColor; opacity: 0.15; border-radius: 4px; margin-bottom: 0.6em; width: 85%;"></div>
+            <div style="height: 1em; background: currentColor; opacity: 0.15; border-radius: 4px; width: 92%;"></div>
+        `;
+
+        const container = contentBox.parentElement!;
+        const pulseAnimation = container.animate([
+            { opacity: 0.5 },
+            { opacity: 1 },
+            { opacity: 0.5 }
+        ], {
+            duration: 1500,
+            iterations: Infinity,
+            easing: 'ease-in-out'
+        });
+
+        const extracted = extractText();
+        if (!extracted || (Array.isArray(extracted) && extracted.length === 0)) {
+            pulseAnimation.cancel();
+            contentBox.innerText = "요약할 텍스트를 찾을 수 없습니다.";
+            isSummarizing = false;
+            return;
+        }
+
+        const textContent = Array.isArray(extracted) ? extracted.join('\n\n') : (typeof extracted === 'string' ? extracted : JSON.stringify(extracted));
+
+        try {
+            const response = await browser.runtime.sendMessage({ action: 'FETCH_SUMMARY', text: textContent });
+            pulseAnimation.cancel();
+            if (response && response.success) {
+                header.innerText = '요약';
+                contentBox.innerText = response.summary;
+                inlineSummaryContainer?.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                contentBox.innerHTML = `<strong>오류 발생:</strong><br>${response?.error || '알 수 없는 오류'}`;
+            }
+        } catch (err: any) {
+            pulseAnimation.cancel();
+            contentBox.innerHTML = `<strong>네트워크 오류:</strong><br>${err.message}`;
+        }
+
+        isSummarizing = false;
     }
 
     function scrollToRef(id: string) {
@@ -164,7 +148,7 @@ import browser from "webextension-polyfill";
     }
 
     function extractText() {
-        const target = document.querySelector('article');
+        const target = document.querySelector('article') || document.querySelector('.article');
         if (!target) return [];
 
         let counter = 0;

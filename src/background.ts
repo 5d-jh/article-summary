@@ -1,5 +1,18 @@
 import browser from "webextension-polyfill";
 
+const action = browser.action || browser.browserAction;
+if (action) {
+    action.onClicked.addListener(async (tab) => {
+        if (tab.id) {
+            try {
+                await browser.tabs.sendMessage(tab.id, { action: 'TOGGLE_SUMMARY_WINDOW' });
+            } catch (err) {
+                console.error("Could not send TOGGLE_SUMMARY_WINDOW to tab", err);
+            }
+        }
+    });
+}
+
 browser.runtime.onMessage.addListener((msg, sender) => {
     if (msg.action === 'FETCH_SUMMARY') {
         return handleFetchSummary(msg.text);
@@ -16,18 +29,15 @@ async function handleFetchSummary(textContent: string) {
             host = host.slice(0, -1);
         }
 
-        const modelName = (settings.lmstudioModel as string) || "llama-3.2-1b-instruct";
-
-        const promptContext = `Create a concise, under 750 characters summary of the following text in Korean. Only answer the summary. Do not include any other text. Do not include any reference tags.\n\nText:\n${textContent}`;
-
-        const res = await fetch(`${host}/v1/chat/completions`, {
+        const res = await fetch(new URL('/api/v1/chat', host), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: modelName,
-                messages: [{ role: "user", content: promptContext }],
+                model: 'google/gemma-3-4b',
+                system_prompt: 'Create a concise summary of the user\'s text in Korean. Do not exceed 4 sentences. Only answer the summary. Do not include any other text.',
+                input: textContent,
                 temperature: 0.7
             })
         });
@@ -36,10 +46,10 @@ async function handleFetchSummary(textContent: string) {
             throw new Error(`LM Studio API Error: ${res.statusText}`);
         }
 
-        const prediction = await res.json();
-        const summary = prediction.choices[0].message.content;
+        let prediction = await res.json();
+        prediction = (prediction.output as any[]).find(it => (it as any).type === 'message')?.content
 
-        return { success: true, summary };
+        return { success: true, summary: prediction };
     } catch (error: any) {
         console.error("Error in background doing summary fetch:", error);
         return { success: false, error: error.message };

@@ -11,7 +11,7 @@ const outDirFirefox = path.join(__dirname, 'dist', 'firefox');
 });
 
 // Build typescript files
-const tsFiles = ['src/popup.ts', 'src/options.ts', 'src/content.ts', 'src/background.ts'];
+const tsFiles = ['src/options.ts', 'src/content.ts', 'src/background.ts'];
 esbuild.buildSync({
     entryPoints: tsFiles,
     outdir: 'dist/temp',
@@ -23,7 +23,7 @@ esbuild.buildSync({
 });
 
 // Copy assets and dist/temp to both browsers
-const assets = ['src/popup.html', 'src/options.html', 'src/styles.css'];
+const assets = ['src/options.html', 'src/styles.css'];
 
 const manifestBase = {
     name: "Article Summary",
@@ -35,9 +35,7 @@ const manifestBase = {
         page: "options.html",
         open_in_tab: true
     },
-    action: {
-        default_popup: "popup.html"
-    },
+    action: {},
     content_scripts: [
         {
             matches: ["<all_urls>"],
@@ -61,9 +59,7 @@ const manifestChrome = {
 const manifestFirefox = {
     ...manifestBase,
     manifest_version: 2,
-    browser_action: {
-        default_popup: "popup.html"
-    },
+    browser_action: {},
     background: {
         scripts: ["background.js"]
     },
@@ -85,10 +81,10 @@ fs.writeFileSync(path.join(outDirFirefox, 'manifest.json'), JSON.stringify(manif
 
 // Copy files
 const copyFiles = (srcDir, destDir) => {
-    ['popup.js', 'options.js', 'content.js', 'background.js'].forEach(f => {
+    ['options.js', 'content.js', 'background.js'].forEach(f => {
         fs.copyFileSync(path.join(__dirname, 'dist', 'temp', f), path.join(destDir, f));
     });
-    ['popup.js.map', 'options.js.map', 'content.js.map', 'background.js.map'].forEach(f => {
+    ['options.js.map', 'content.js.map', 'background.js.map'].forEach(f => {
         fs.copyFileSync(path.join(__dirname, 'dist', 'temp', f), path.join(destDir, f));
     });
     assets.forEach(f => {
