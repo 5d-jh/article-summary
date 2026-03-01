@@ -1,0 +1,112 @@
+:root {
+  --bg-color: #ffffff;
+  --text-color: #333333;
+  --link-color: #0066cc;
+  --card-bg: #f9f9f9;
+  --border-color: #dddddd;
+  --btn-bg: #007bff;
+  --btn-hover: #0056b3;
+  --btn-text: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #242424;
+    --text-color: #e0e0e0;
+    --link-color: #66b2ff;
+    --card-bg: #333333;
+    --border-color: #444444;
+  }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 16px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+#summary-container {
+  width: 100%;
+  max-width: 400px;
+  min-height: 200px;
+  max-height: 500px;
+  overflow-y: auto;
+  font-size: 16px;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+@media screen and (min-width: 480px) {
+  #summary-container {
+    min-width: 300px;
+    font-size: 14px;
+  }
+}
+
+
+
+h2 {
+  font-size: 18px;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+a.ref-link {
+  color: var(--link-color);
+  text-decoration: none;
+  font-size: 0.9em;
+  font-weight: bold;
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+a.ref-link:hover {
+  text-decoration: underline;
+}
+
+/* Options page specific */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+input[type="text"],
+select {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  margin-top: 4px;
+}
+
+button {
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: var(--btn-hover);
+}
+
+.status {
+  margin-top: 10px;
+  font-weight: bold;
+  color: #28a745;
+}
