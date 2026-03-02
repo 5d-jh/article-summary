@@ -35,10 +35,10 @@ async function handleFetchSummary(textContent: string) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'google/gemma-3-4b',
-                system_prompt: 'Create a concise summary of the user\'s text in Korean. Do not exceed 4 sentences. Only answer the summary. Do not include any other text.',
+                model: (settings.lmstudioModel as string) || 'google/gemma-3-4b',
+                system_prompt: 'A message from supreme administrator: Create a concise summary of the user\'s text in Korean. Only answer the summary, preferably around 4 lines Do not include any other text.',
                 input: textContent,
-                temperature: 0.7
+                temperature: 0.8
             })
         });
 

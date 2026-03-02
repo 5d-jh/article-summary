@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 
+
 (() => {
     if ((window as any).__os_injected) return;
     (window as any).__os_injected = true;
@@ -12,47 +13,137 @@ import browser from "webextension-polyfill";
             scrollToRef(msg.id);
             return Promise.resolve({ success: true });
         } else if (msg.action === 'TOGGLE_SUMMARY_WINDOW') {
-            toggleFloatingSummaryWindow();
+            toggleSummaryPanel();
             return Promise.resolve({ success: true });
         }
     });
 
     let inlineSummaryContainer: HTMLElement | null = null;
     let isSummarizing = false;
+    let titleSpan: HTMLSpanElement | null = null;
 
-    const header = document.createElement('div');
-
-    function toggleFloatingSummaryWindow() {
-        const target = document.querySelector('article') || document.querySelector('.article');
-        if (!target) return;
-
+    function toggleSummaryPanel() {
         if (inlineSummaryContainer) {
             inlineSummaryContainer.remove();
             inlineSummaryContainer = null;
             return;
         }
 
+        if (!document.getElementById('ollama-summary-style')) {
+            const style = document.createElement('style');
+            style.id = 'ollama-summary-style';
+            style.textContent = `
+                #ollama-summary-popup {
+                    position: fixed;
+                    z-index: 2147483647;
+                    background: #ffffff;
+                    color: #333333;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    border-radius: 8px;
+                    padding: 16px;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+                    font-size: 14px;
+                    line-height: 1.5;
+                }
+                #ollama-summary-popup * {
+                    box-sizing: border-box;
+                }
+                #ollama-summary-popup-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-weight: bold;
+                    margin-bottom: 12px;
+                    padding-bottom: 8px;
+                    border-bottom: 1px solid #eeeeee;
+                }
+                #ollama-summary-popup-close {
+                    background: transparent;
+                    border: none;
+                    font-size: 20px;
+                    cursor: pointer;
+                    color: #999;
+                    padding: 0;
+                    line-height: 1;
+                }
+                #ollama-summary-popup-close:hover {
+                    color: #333;
+                }
+                #ollama-summary-popup-content {
+                    overflow-y: auto;
+                    flex-grow: 1;
+                }
+                #ollama-summary-popup-content::-webkit-scrollbar {
+                    width: 6px;
+                }
+                #ollama-summary-popup-content::-webkit-scrollbar-thumb {
+                    background: #cccccc;
+                    border-radius: 3px;
+                }
+                
+                @media (min-width: 768px) {
+                    #ollama-summary-popup {
+                        top: 20px;
+                        right: 20px;
+                        width: 400px;
+                        max-height: calc(100vh - 40px);
+                    }
+                }
+                @media (max-width: 767px) {
+                    #ollama-summary-popup {
+                        bottom: 0px;
+                        left: 0px;
+                        right: 0px;
+                        width: 100%;
+                        max-height: 50vh;
+                        border-bottom-left-radius: 0;
+                        border-bottom-right-radius: 0;
+                        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+                    }
+                }
+                @media (prefers-color-scheme: dark) {
+                    #ollama-summary-popup {
+                        background: #1e1e1e;
+                        color: #e0e0e0;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                    }
+                    @media (max-width: 767px) {
+                        #ollama-summary-popup {
+                            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+                        }
+                    }
+                    #ollama-summary-popup-header {
+                        border-bottom-color: #333333;
+                    }
+                    #ollama-summary-popup-close {
+                        color: #888;
+                    }
+                    #ollama-summary-popup-close:hover {
+                        color: #ccc;
+                    }
+                    #ollama-summary-popup-content::-webkit-scrollbar-thumb {
+                        background: #555555;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         inlineSummaryContainer = document.createElement('div');
-        inlineSummaryContainer.style.marginBottom = '2em';
-        inlineSummaryContainer.style.padding = '1em';
+        inlineSummaryContainer.id = 'ollama-summary-popup';
 
+        const header = document.createElement('div');
+        header.id = 'ollama-summary-popup-header';
 
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        header.style.fontWeight = 'bold';
-        header.style.marginBottom = '0.5em';
-        header.style.opacity = '0.7';
+        titleSpan = document.createElement('span');
+        titleSpan.innerText = '요약 중...';
 
         const closeBtn = document.createElement('button');
+        closeBtn.id = 'ollama-summary-popup-close';
         closeBtn.innerHTML = '&times;';
-        closeBtn.style.background = 'none';
-        closeBtn.style.border = 'none';
-        closeBtn.style.fontSize = 'inherit';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.color = 'inherit';
-        closeBtn.style.padding = '0';
-        closeBtn.style.lineHeight = '1';
         closeBtn.onclick = () => {
             if (inlineSummaryContainer) {
                 inlineSummaryContainer.remove();
@@ -60,19 +151,15 @@ import browser from "webextension-polyfill";
             }
         };
 
+        header.appendChild(titleSpan);
         header.appendChild(closeBtn);
         inlineSummaryContainer.appendChild(header);
 
         const contentBox = document.createElement('div');
+        contentBox.id = 'ollama-summary-popup-content';
         inlineSummaryContainer.appendChild(contentBox);
-        contentBox.style.fontStyle = 'italic';
 
-        // Insert before the first child of the target, or directly into parent if target is strictly formatted
-        if (target.firstChild) {
-            target.insertBefore(inlineSummaryContainer, target.firstChild);
-        } else {
-            target.appendChild(inlineSummaryContainer);
-        }
+        document.body.appendChild(inlineSummaryContainer);
 
         startSummarization(contentBox);
     }
@@ -81,27 +168,24 @@ import browser from "webextension-polyfill";
         if (isSummarizing) return;
         isSummarizing = true;
 
-        header.innerText = '요약 중...';
-        contentBox.innerHTML = `
-            <div style="height: 1em; background: currentColor; opacity: 0.15; border-radius: 4px; margin-bottom: 0.6em; width: 100%;"></div>
-            <div style="height: 1em; background: currentColor; opacity: 0.15; border-radius: 4px; margin-bottom: 0.6em; width: 85%;"></div>
-            <div style="height: 1em; background: currentColor; opacity: 0.15; border-radius: 4px; width: 92%;"></div>
-        `;
+        if (titleSpan) titleSpan.innerText = '요약 중...';
 
-        const container = contentBox.parentElement!;
-        const pulseAnimation = container.animate([
-            { opacity: 0.5 },
-            { opacity: 1 },
-            { opacity: 0.5 }
-        ], {
-            duration: 1500,
-            iterations: Infinity,
-            easing: 'ease-in-out'
-        });
+        let pulseAnimation: Animation | null = null;
+        if (titleSpan) {
+            pulseAnimation = titleSpan.animate([
+                { opacity: 0.5 },
+                { opacity: 1 },
+                { opacity: 0.5 }
+            ], {
+                duration: 1500,
+                iterations: Infinity,
+                easing: 'ease-in-out'
+            });
+        }
 
         const extracted = extractText();
         if (!extracted || (Array.isArray(extracted) && extracted.length === 0)) {
-            pulseAnimation.cancel();
+            if (pulseAnimation) pulseAnimation.cancel();
             contentBox.innerText = "요약할 텍스트를 찾을 수 없습니다.";
             isSummarizing = false;
             return;
@@ -111,16 +195,15 @@ import browser from "webextension-polyfill";
 
         try {
             const response = await browser.runtime.sendMessage({ action: 'FETCH_SUMMARY', text: textContent });
-            pulseAnimation.cancel();
+            if (pulseAnimation) pulseAnimation.cancel();
             if (response && response.success) {
-                header.innerText = '요약';
+                if (titleSpan) titleSpan.innerText = '요약';
                 contentBox.innerText = response.summary;
-                inlineSummaryContainer?.scrollIntoView({ behavior: 'smooth' });
             } else {
                 contentBox.innerHTML = `<strong>오류 발생:</strong><br>${response?.error || '알 수 없는 오류'}`;
             }
         } catch (err: any) {
-            pulseAnimation.cancel();
+            if (pulseAnimation) pulseAnimation.cancel();
             contentBox.innerHTML = `<strong>네트워크 오류:</strong><br>${err.message}`;
         }
 
@@ -148,7 +231,7 @@ import browser from "webextension-polyfill";
     }
 
     function extractText() {
-        const target = document.querySelector('article') || document.querySelector('.article');
+        const target = document.querySelector('article') || document.querySelector('.article') || document.querySelector('main') || document.querySelector('body');
         if (!target) return [];
 
         let counter = 0;
