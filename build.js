@@ -1,6 +1,7 @@
 const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const outDirChrome = path.join(__dirname, 'dist', 'chrome');
 const outDirFirefox = path.join(__dirname, 'dist', 'firefox');
@@ -22,13 +23,20 @@ esbuild.buildSync({
     sourcemap: true
 });
 
+// Generate icons from SVG using macs native sips tool
+const iconSizes = [16, 32, 48, 128];
+iconSizes.forEach(size => {
+    console.log(`Generating ${size}x${size} icon...`);
+    execSync(`sips -s format png -z ${size} ${size} icon.svg --out icon${size}.png`);
+});
+
 // Copy assets and dist/temp to both browsers
-const assets = ['src/options.html', 'src/styles.css'];
+const assets = ['src/options.html', 'src/styles.css', 'icon16.png', 'icon32.png', 'icon48.png', 'icon128.png'];
 
 const manifestBase = {
-    name: "Article Summary",
+    name: "MyGist",
     version: "1.0",
-    description: "Browser extension to summarize web content using your local LLMs.",
+    description: "Summarize webpages privately using your own local LLMs.",
     permissions: ["storage", "activeTab", "scripting"],
     host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
     options_ui: {
@@ -41,7 +49,13 @@ const manifestBase = {
             matches: ["<all_urls>"],
             js: ["content.js"]
         }
-    ]
+    ],
+    icons: {
+        "16": "icon16.png",
+        "32": "icon32.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+    }
 };
 
 // --- Chrome Manifest (V3) ---
@@ -66,7 +80,10 @@ const manifestFirefox = {
     browser_specific_settings: {
         gecko: {
             id: "ollamasummary@example.com",
-            strict_min_version: "109.0"
+            strict_min_version: "109.0",
+            data_collection_permissions: {
+                required: ["none"]
+            }
         }
     }
 };
