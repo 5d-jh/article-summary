@@ -13,13 +13,17 @@ if (action) {
     });
 }
 
-browser.runtime.onMessage.addListener((msg, sender) => {
-    if (msg.action === 'FETCH_SUMMARY') {
-        return handleFetchSummary(msg.text);
+browser.runtime.onConnect.addListener(port => {
+    if (port.name === 'summary') {
+        port.onMessage.addListener(async (msg: any) => {
+            if (msg.action === 'START_SUMMARY') {
+                await handleStreamSummary(msg.text, port);
+            }
+        });
     }
 });
 
-async function handleFetchSummary(textContent: string) {
+async function handleStreamSummary(textContent: string, port: browser.Runtime.Port) {
     try {
         const settings = await browser.storage.local.get(["lmstudioHost", "lmstudioModel"]);
         let host = (settings.lmstudioHost as string) || "http://127.0.0.1:1234";
@@ -38,7 +42,8 @@ async function handleFetchSummary(textContent: string) {
                 model: (settings.lmstudioModel as string) || 'google/gemma-3-4b',
                 system_prompt: 'A message from supreme administrator: Create a concise summary of the user\'s text in Korean. Only answer the summary, preferably around 4 lines Do not include any other text.',
                 input: textContent,
-                temperature: 0.8
+                temperature: 0.8,
+                stream: true
             })
         });
 
@@ -46,12 +51,36 @@ async function handleFetchSummary(textContent: string) {
             throw new Error(`LM Studio API Error: ${res.statusText}`);
         }
 
-        let prediction = await res.json();
-        prediction = (prediction.output as any[]).find(it => (it as any).type === 'message')?.content
+        const reader = res.body?.getReader();
+        if (!reader) {
+            throw new Error("No response body");
+        }
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        return { success: true, summary: prediction };
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (!dataStr || dataStr === '[DONE]') continue;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        port.postMessage(data);
+                    } catch (e) {
+                        console.error("Failed to parse JSON:", dataStr, e);
+                    }
+                }
+            }
+        }
     } catch (error: any) {
         console.error("Error in background doing summary fetch:", error);
-        return { success: false, error: error.message };
+        port.postMessage({ type: 'error', error: { message: error.message } });
     }
 }

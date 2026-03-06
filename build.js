@@ -79,7 +79,7 @@ const manifestFirefox = {
     },
     browser_specific_settings: {
         gecko: {
-            id: "ollamasummary@example.com",
+            id: "mygist@5d-jh.dev",
             strict_min_version: "109.0",
             data_collection_permissions: {
                 required: ["none"]

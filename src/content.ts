@@ -194,20 +194,93 @@ import browser from "webextension-polyfill";
         const textContent = Array.isArray(extracted) ? extracted.join('\n\n') : (typeof extracted === 'string' ? extracted : JSON.stringify(extracted));
 
         try {
-            const response = await browser.runtime.sendMessage({ action: 'FETCH_SUMMARY', text: textContent });
-            if (pulseAnimation) pulseAnimation.cancel();
-            if (response && response.success) {
-                if (titleSpan) titleSpan.innerText = '요약';
-                contentBox.innerText = response.summary;
-            } else {
-                contentBox.innerHTML = `<strong>오류 발생:</strong><br>${response?.error || '알 수 없는 오류'}`;
-            }
+            contentBox.innerText = '준비 중...';
+            const port = browser.runtime.connect({ name: 'summary' });
+            port.postMessage({ action: 'START_SUMMARY', text: textContent });
+
+            let hasReceivedMessage = false;
+            let currentModel = '';
+
+            port.onMessage.addListener((msg: any) => {
+                if (msg.model_instance_id) {
+                    const parts = msg.model_instance_id.split('/');
+                    currentModel = parts[parts.length - 1]; // simplify model name
+                }
+
+                if (titleSpan) {
+                    titleSpan.innerText = '요약 중...';
+                }
+
+                if (msg.type === 'model_load.start' || msg.type === 'model_load.progress') {
+                    contentBox.innerText = '모델 로딩 중...'
+                }
+
+                if (msg.type === 'chat.start' || msg.type === 'prompt_processing.progress') {
+                    if (!hasReceivedMessage) {
+                        titleSpan!.innerText = '요약 중...';
+                    }
+                } else if (msg.type === 'reasoning.start' || msg.type === 'reasoning.delta') {
+                    if (!hasReceivedMessage) {
+                        contentBox.innerText = '생각 중...'
+                    }
+                } else if (msg.type === 'message.delta') {
+                    if (!hasReceivedMessage) {
+                        hasReceivedMessage = true;
+                        contentBox.innerText = '';
+                        contentBox.style.whiteSpace = 'pre-wrap';
+                        if (pulseAnimation) pulseAnimation.cancel();
+                        if (titleSpan) titleSpan.style.opacity = '1';
+                        titleSpan!.innerText = '요약';
+                    }
+                    const span = document.createElement('span');
+                    span.textContent = msg.content;
+                    span.style.opacity = '0';
+                    span.style.transition = 'opacity 0.2s ease-in';
+                    contentBox.appendChild(span);
+
+                    // Trigger reflow to apply transition
+                    void span.offsetWidth;
+                    span.style.opacity = '1';
+                } else if (msg.type === 'chat.end') {
+                    if (!hasReceivedMessage) {
+                        hasReceivedMessage = true;
+                        if (pulseAnimation) pulseAnimation.cancel();
+                        if (titleSpan) titleSpan.style.opacity = '1';
+                        titleSpan!.innerText = '요약';
+                        if (msg.result?.output) {
+                            const messageObj = msg.result.output.find((o: any) => o.type === 'message');
+                            if (messageObj) {
+                                contentBox.innerText = messageObj.content;
+                            }
+                        }
+                    }
+                    isSummarizing = false;
+                    port.disconnect();
+                } else if (msg.type === 'error') {
+                    if (pulseAnimation) pulseAnimation.cancel();
+                    contentBox.innerHTML = `<strong>오류 발생:</strong><br>${msg.error?.message || '알 수 없는 오류'}`;
+                    isSummarizing = false;
+                    port.disconnect();
+                }
+            });
+
+            port.onDisconnect.addListener(() => {
+                if (isSummarizing) {
+                    if (pulseAnimation) pulseAnimation.cancel();
+                    if (titleSpan) titleSpan.style.opacity = '1';
+                    if (!hasReceivedMessage) {
+                        contentBox.innerHTML += `<br><strong>연결이 끊어졌습니다.</strong>`;
+                    }
+                    isSummarizing = false;
+                }
+            });
+
         } catch (err: any) {
             if (pulseAnimation) pulseAnimation.cancel();
+            if (titleSpan) titleSpan.style.opacity = '1';
             contentBox.innerHTML = `<strong>네트워크 오류:</strong><br>${err.message}`;
+            isSummarizing = false;
         }
-
-        isSummarizing = false;
     }
 
     function scrollToRef(id: string) {
