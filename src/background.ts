@@ -13,6 +13,29 @@ if (action) {
     });
 }
 
+// Dynamic icon switching for dark/light mode (primarily for Chrome; Firefox uses theme_icons in manifest)
+function updateIcon(isDark: boolean) {
+    if (!action) return;
+    const suffix = isDark ? '-dark' : '';
+    const iconPath: Record<string, string> = {
+        '16': `icon16${suffix}.png`,
+        '32': `icon32${suffix}.png`,
+        '48': `icon48${suffix}.png`,
+        '128': `icon128${suffix}.png`,
+    };
+    action.setIcon({ path: iconPath }).catch(() => {
+        // Ignore errors (e.g., if theme_icons is handling it in Firefox)
+    });
+}
+
+try {
+    const mql = matchMedia('(prefers-color-scheme: dark)');
+    updateIcon(mql.matches);
+    mql.addEventListener('change', (e) => updateIcon(e.matches));
+} catch {
+    // matchMedia may not be available in some environments (e.g., older service workers)
+}
+
 browser.runtime.onConnect.addListener(port => {
     if (port.name === 'summary') {
         port.onMessage.addListener(async (msg: any) => {

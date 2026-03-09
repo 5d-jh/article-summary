@@ -20,7 +20,6 @@ esbuild.buildSync({
     format: 'iife',
     platform: 'browser',
     target: ['es2020'],
-    sourcemap: true
 });
 
 // Generate icons from SVG using macs native sips tool
@@ -30,8 +29,14 @@ iconSizes.forEach(size => {
     execSync(`sips -s format png -z ${size} ${size} icon.svg --out icon${size}.png`);
 });
 
+// Generate dark-mode icons (bright version for dark backgrounds)
+iconSizes.forEach(size => {
+    console.log(`Generating ${size}x${size} dark-mode icon...`);
+    execSync(`sips -s format png -z ${size} ${size} icon-dark.svg --out icon${size}-dark.png`);
+});
+
 // Copy assets and dist/temp to both browsers
-const assets = ['src/options.html', 'src/styles.css', 'icon16.png', 'icon32.png', 'icon48.png', 'icon128.png'];
+const assets = ['src/options.html', 'src/styles.css', 'icon16.png', 'icon32.png', 'icon48.png', 'icon128.png', 'icon16-dark.png', 'icon32-dark.png', 'icon48-dark.png', 'icon128-dark.png'];
 
 const manifestBase = {
     name: "MyGist",
@@ -73,7 +78,14 @@ const manifestChrome = {
 const manifestFirefox = {
     ...manifestBase,
     manifest_version: 2,
-    browser_action: {},
+    browser_action: {
+        theme_icons: iconSizes.map(size => ({
+            light: `icon${size}-dark.png`,
+            dark: `icon${size}.png`,
+            size: size
+        })),
+        default_icon: 'icon48.png'
+    },
     background: {
         scripts: ["background.js"]
     },
