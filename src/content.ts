@@ -18,14 +18,15 @@ import browser from "webextension-polyfill";
         }
     });
 
-    let inlineSummaryContainer: HTMLElement | null = null;
+    const inlineSummaryContainer: HTMLElement = document.createElement('div');
+    inlineSummaryContainer.hidden = true;
+
     let isSummarizing = false;
-    let titleSpan: HTMLSpanElement | null = null;
 
     function toggleSummaryPanel() {
-        if (inlineSummaryContainer) {
-            inlineSummaryContainer.remove();
-            inlineSummaryContainer = null;
+        // If already in the DOM, just toggle visibility
+        if (document.getElementById('ollama-summary-popup')) {
+            inlineSummaryContainer.hidden = !inlineSummaryContainer.hidden;
             return;
         }
 
@@ -51,16 +52,11 @@ import browser from "webextension-polyfill";
                 #ollama-summary-popup * {
                     box-sizing: border-box;
                 }
-                #ollama-summary-popup-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    font-weight: bold;
-                    margin-bottom: 12px;
-                    padding-bottom: 8px;
-                    border-bottom: 1px solid #eeeeee;
-                }
+
                 #ollama-summary-popup-close {
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
                     background: transparent;
                     border: none;
                     font-size: 20px;
@@ -115,9 +111,7 @@ import browser from "webextension-polyfill";
                             box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
                         }
                     }
-                    #ollama-summary-popup-header {
-                        border-bottom-color: #333333;
-                    }
+
                     #ollama-summary-popup-close {
                         color: #888;
                     }
@@ -127,38 +121,47 @@ import browser from "webextension-polyfill";
                     #ollama-summary-popup-content::-webkit-scrollbar-thumb {
                         background: #555555;
                     }
+                    .ollama-skeleton-line {
+                        background-image: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
+                    }
+                }
+
+                .ollama-skeleton-line {
+                    height: 14px;
+                    border-radius: 4px;
+                    background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+                    background-size: 200% 100%;
+                    animation: ollama-skeleton-pulse 1.5s ease-in-out infinite;
+                    margin-bottom: 10px;
+                }
+                .ollama-skeleton-line:nth-child(1) { width: 95%; }
+                .ollama-skeleton-line:nth-child(2) { width: 80%; }
+                .ollama-skeleton-line:nth-child(3) { width: 60%; }
+
+                @keyframes ollama-skeleton-pulse {
+                    0% { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
                 }
             `;
             document.head.appendChild(style);
         }
 
-        inlineSummaryContainer = document.createElement('div');
+
         inlineSummaryContainer.id = 'ollama-summary-popup';
-
-        const header = document.createElement('div');
-        header.id = 'ollama-summary-popup-header';
-
-        titleSpan = document.createElement('span');
-        titleSpan.innerText = '요약 중...';
 
         const closeBtn = document.createElement('button');
         closeBtn.id = 'ollama-summary-popup-close';
         closeBtn.innerHTML = '&times;';
         closeBtn.onclick = () => {
-            if (inlineSummaryContainer) {
-                inlineSummaryContainer.remove();
-                inlineSummaryContainer = null;
-            }
+            inlineSummaryContainer.hidden = true;
         };
-
-        header.appendChild(titleSpan);
-        header.appendChild(closeBtn);
-        inlineSummaryContainer.appendChild(header);
+        inlineSummaryContainer.appendChild(closeBtn);
 
         const contentBox = document.createElement('div');
         contentBox.id = 'ollama-summary-popup-content';
         inlineSummaryContainer.appendChild(contentBox);
 
+        inlineSummaryContainer.hidden = false;
         document.body.appendChild(inlineSummaryContainer);
 
         startSummarization(contentBox);
@@ -168,24 +171,8 @@ import browser from "webextension-polyfill";
         if (isSummarizing) return;
         isSummarizing = true;
 
-        if (titleSpan) titleSpan.innerText = '요약 중...';
-
-        let pulseAnimation: Animation | null = null;
-        if (titleSpan) {
-            pulseAnimation = titleSpan.animate([
-                { opacity: 0.5 },
-                { opacity: 1 },
-                { opacity: 0.5 }
-            ], {
-                duration: 1500,
-                iterations: Infinity,
-                easing: 'ease-in-out'
-            });
-        }
-
         const extracted = extractText();
         if (!extracted || (Array.isArray(extracted) && extracted.length === 0)) {
-            if (pulseAnimation) pulseAnimation.cancel();
             contentBox.innerText = "요약할 텍스트를 찾을 수 없습니다.";
             isSummarizing = false;
             return;
@@ -194,9 +181,8 @@ import browser from "webextension-polyfill";
         const textContent = Array.isArray(extracted) ? extracted.join('\n\n') : (typeof extracted === 'string' ? extracted : JSON.stringify(extracted));
 
         try {
-            contentBox.innerText = '준비 중...';
             const port = browser.runtime.connect({ name: 'summary' });
-            port.postMessage({ action: 'START_SUMMARY', text: textContent });
+            port.postMessage({ action: 'START_SUMMARY', text: textContent, language: navigator.language });
 
             let hasReceivedMessage = false;
             let currentModel = '';
@@ -207,30 +193,23 @@ import browser from "webextension-polyfill";
                     currentModel = parts[parts.length - 1]; // simplify model name
                 }
 
-                if (titleSpan) {
-                    titleSpan.innerText = '요약 중...';
-                }
-
                 if (msg.type === 'model_load.start' || msg.type === 'model_load.progress') {
-                    contentBox.innerText = '모델 로딩 중...'
+                    contentBox.innerText = `${currentModel}...`;
                 }
 
                 if (msg.type === 'chat.start' || msg.type === 'prompt_processing.progress') {
                     if (!hasReceivedMessage) {
-                        titleSpan!.innerText = '요약 중...';
-                    }
-                } else if (msg.type === 'reasoning.start' || msg.type === 'reasoning.delta') {
-                    if (!hasReceivedMessage) {
-                        contentBox.innerText = '생각 중...'
+                        contentBox.innerHTML = `
+                            <div class="ollama-skeleton-line"></div>
+                            <div class="ollama-skeleton-line"></div>
+                            <div class="ollama-skeleton-line"></div>
+                        `;
                     }
                 } else if (msg.type === 'message.delta') {
                     if (!hasReceivedMessage) {
                         hasReceivedMessage = true;
                         contentBox.innerText = '';
                         contentBox.style.whiteSpace = 'pre-wrap';
-                        if (pulseAnimation) pulseAnimation.cancel();
-                        if (titleSpan) titleSpan.style.opacity = '1';
-                        titleSpan!.innerText = '요약';
                     }
                     const span = document.createElement('span');
                     span.textContent = msg.content;
@@ -244,9 +223,6 @@ import browser from "webextension-polyfill";
                 } else if (msg.type === 'chat.end') {
                     if (!hasReceivedMessage) {
                         hasReceivedMessage = true;
-                        if (pulseAnimation) pulseAnimation.cancel();
-                        if (titleSpan) titleSpan.style.opacity = '1';
-                        titleSpan!.innerText = '요약';
                         if (msg.result?.output) {
                             const messageObj = msg.result.output.find((o: any) => o.type === 'message');
                             if (messageObj) {
@@ -257,29 +233,19 @@ import browser from "webextension-polyfill";
                     isSummarizing = false;
                     port.disconnect();
                 } else if (msg.type === 'error') {
-                    if (pulseAnimation) pulseAnimation.cancel();
-                    contentBox.innerHTML = `<strong>오류 발생:</strong><br>${msg.error?.message || '알 수 없는 오류'}`;
-                    isSummarizing = false;
+                    contentBox.innerHTML = `<strong>Error:</strong><br> ${msg.error?.message || 'Unknown Error'}`;
                     port.disconnect();
                 }
             });
 
             port.onDisconnect.addListener(() => {
-                if (isSummarizing) {
-                    if (pulseAnimation) pulseAnimation.cancel();
-                    if (titleSpan) titleSpan.style.opacity = '1';
-                    if (!hasReceivedMessage) {
-                        contentBox.innerHTML += `<br><strong>연결이 끊어졌습니다.</strong>`;
-                    }
-                    isSummarizing = false;
+                if (!hasReceivedMessage) {
+                    contentBox.innerHTML += `<strong>Error:</strong><br> disconnected`;
                 }
             });
 
         } catch (err: any) {
-            if (pulseAnimation) pulseAnimation.cancel();
-            if (titleSpan) titleSpan.style.opacity = '1';
-            contentBox.innerHTML = `<strong>네트워크 오류:</strong><br>${err.message}`;
-            isSummarizing = false;
+            contentBox.innerHTML = `<strong>Error:</strong><br> ${err.message}`;
         }
     }
 

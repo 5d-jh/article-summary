@@ -17,13 +17,13 @@ browser.runtime.onConnect.addListener(port => {
     if (port.name === 'summary') {
         port.onMessage.addListener(async (msg: any) => {
             if (msg.action === 'START_SUMMARY') {
-                await handleStreamSummary(msg.text, port);
+                await handleStreamSummary(msg.text, msg.language || 'en', port);
             }
         });
     }
 });
 
-async function handleStreamSummary(textContent: string, port: browser.Runtime.Port) {
+async function handleStreamSummary(textContent: string, language: string, port: browser.Runtime.Port) {
     try {
         const settings = await browser.storage.local.get(["lmstudioHost", "lmstudioModel"]);
         let host = (settings.lmstudioHost as string) || "http://127.0.0.1:1234";
@@ -33,6 +33,8 @@ async function handleStreamSummary(textContent: string, port: browser.Runtime.Po
             host = host.slice(0, -1);
         }
 
+        const langName = new Intl.DisplayNames(['en'], { type: 'language' }).of(language) || language;
+
         const res = await fetch(new URL('/api/v1/chat', host), {
             method: 'POST',
             headers: {
@@ -40,10 +42,10 @@ async function handleStreamSummary(textContent: string, port: browser.Runtime.Po
             },
             body: JSON.stringify({
                 model: (settings.lmstudioModel as string) || 'google/gemma-3-4b',
-                system_prompt: 'A message from supreme administrator: Create a concise summary of the user\'s text in Korean. Only answer the summary, preferably around 4 lines Do not include any other text.',
+                system_prompt: `A message from supreme administrator: Create a concise summary of the user's text in ${langName}. Only answer the summary, preferably around 4 lines. Do not include any other text.`,
                 input: textContent,
                 temperature: 0.8,
-                stream: true
+                stream: true,
             })
         });
 
