@@ -40,7 +40,7 @@ const assets = ['src/options.html', 'src/styles.css', 'icon16.png', 'icon32.png'
 
 const manifestBase = {
     name: "MyGist",
-    version: "1.0",
+    version: "1.1",
     description: "Summarize webpages privately using your own local LLMs.",
     permissions: ["storage", "activeTab", "scripting"],
     host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
@@ -113,9 +113,9 @@ const copyFiles = (srcDir, destDir) => {
     ['options.js', 'content.js', 'background.js'].forEach(f => {
         fs.copyFileSync(path.join(__dirname, 'dist', 'temp', f), path.join(destDir, f));
     });
-    ['options.js.map', 'content.js.map', 'background.js.map'].forEach(f => {
-        fs.copyFileSync(path.join(__dirname, 'dist', 'temp', f), path.join(destDir, f));
-    });
+    // ['options.js.map', 'content.js.map', 'background.js.map'].forEach(f => {
+    //     fs.copyFileSync(path.join(__dirname, 'dist', 'temp', f), path.join(destDir, f));
+    // });
     assets.forEach(f => {
         fs.copyFileSync(path.join(__dirname, f), path.join(destDir, path.basename(f)));
     });
