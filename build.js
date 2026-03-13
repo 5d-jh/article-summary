@@ -40,7 +40,7 @@ const assets = ['src/options.html', 'src/styles.css', 'icon16.png', 'icon32.png'
 
 const manifestBase = {
     name: "MyGist",
-    version: "1.1",
+    version: "1.2.0",
     description: "Summarize webpages privately using your own local LLMs.",
     permissions: ["storage", "activeTab"],
     host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
