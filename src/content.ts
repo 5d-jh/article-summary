@@ -18,17 +18,18 @@ import browser from "webextension-polyfill";
         }
     });
 
-    const inlineSummaryContainer: HTMLElement = document.createElement('div');
-    inlineSummaryContainer.hidden = true;
-
+    let inlineSummaryContainer: HTMLElement | null = null;
     let isSummarizing = false;
 
     function toggleSummaryPanel() {
         // If already in the DOM, just toggle visibility
-        if (document.getElementById('ollama-summary-popup')) {
-            inlineSummaryContainer.hidden = !inlineSummaryContainer.hidden;
+        if (inlineSummaryContainer) {
+            inlineSummaryContainer.remove();
+            inlineSummaryContainer = null;
             return;
         }
+
+        inlineSummaryContainer = document.createElement('div');
 
         if (!document.getElementById('ollama-summary-style')) {
             const style = document.createElement('style');
@@ -54,16 +55,13 @@ import browser from "webextension-polyfill";
                 }
 
                 #ollama-summary-popup-close {
-                    position: absolute;
-                    top: 8px;
-                    right: 8px;
                     background: transparent;
                     border: none;
-                    font-size: 20px;
                     cursor: pointer;
                     color: #999;
-                    padding: 0;
-                    line-height: 1;
+                    line-height: 1; 
+                    padding-top: 0.3em;
+                    font-size: 1.2em;
                 }
                 #ollama-summary-popup-close:hover {
                     color: #333;
@@ -133,6 +131,7 @@ import browser from "webextension-polyfill";
                     background-size: 200% 100%;
                     animation: ollama-skeleton-pulse 1.5s ease-in-out infinite;
                     margin-bottom: 10px;
+                    opacity: 0.6;
                 }
                 .ollama-skeleton-line:nth-child(1) { width: 95%; }
                 .ollama-skeleton-line:nth-child(2) { width: 80%; }
@@ -149,20 +148,21 @@ import browser from "webextension-polyfill";
 
         inlineSummaryContainer.id = 'ollama-summary-popup';
 
-        const closeBtn = document.createElement('button');
-        closeBtn.id = 'ollama-summary-popup-close';
-        closeBtn.innerHTML = '&times;';
-        closeBtn.onclick = () => {
-            inlineSummaryContainer.hidden = true;
-        };
-        inlineSummaryContainer.appendChild(closeBtn);
-
         const contentBox = document.createElement('div');
         contentBox.id = 'ollama-summary-popup-content';
         inlineSummaryContainer.appendChild(contentBox);
 
         inlineSummaryContainer.hidden = false;
         document.body.appendChild(inlineSummaryContainer);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'ollama-summary-popup-close';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = () => {
+            inlineSummaryContainer?.remove();
+            inlineSummaryContainer = null;
+        };
+        inlineSummaryContainer.appendChild(closeBtn);
 
         startSummarization(contentBox);
     }
