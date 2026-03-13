@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LM Studio Summary Settings</title>
+    <title>MyGist Settings</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         body {
@@ -16,20 +16,20 @@
 </head>
 
 <body>
-    <h2>LM Studio Summary 설정</h2>
+    <h2>MyGist Settings</h2>
     <form id="options-form">
         <label>
-            LM Studio Host (예: ws://127.0.0.1:1234):
+            LM Studio Host (e.g. http://127.0.0.1:1234):
             <input type="text" id="host" placeholder="http://127.0.0.1:1234">
         </label>
         <label>
             Model:
             <select id="model">
-                <option value="" disabled selected>모델을 불러오는 중...</option>
+                <option value="" disabled selected>Loading models...</option>
             </select>
         </label>
 
-        <button type="submit">저장</button>
+        <button type="submit">Save</button>
         <div id="status" class="status"></div>
     </form>
     <script src="options.js"></script>
