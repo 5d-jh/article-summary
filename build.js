@@ -42,7 +42,7 @@ const manifestBase = {
     name: "MyGist",
     version: "1.1",
     description: "Summarize webpages privately using your own local LLMs.",
-    permissions: ["storage", "activeTab", "scripting"],
+    permissions: ["storage", "activeTab"],
     host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
     options_ui: {
         page: "options.html",
