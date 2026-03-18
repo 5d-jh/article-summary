@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyGist</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #ffffff;
+            --bg-secondary: #f5f5f7;
+            --text: #1d1d1f;
+            --text-muted: #6e6e73;
+            --border: #d2d2d7;
+            --accent: #0071e3;
+            --accent-hover: #0077ed;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            --radius: 10px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1c1c1e;
+                --bg-secondary: #2c2c2e;
+                --text: #f5f5f7;
+                --text-muted: #98989d;
+                --border: #3a3a3c;
+                --accent: #2997ff;
+                --accent-hover: #47a8ff;
+                --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            }
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body {
+            width: 380px;
+            min-height: 200px;
+            max-height: 560px;
+        }
+
+        /* In detached window mode, remove fixed width and allow full height */
+        body.detached {
+            width: 100%;
+            max-height: none;
+            height: 100vh;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px 10px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--bg);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+            color: var(--text);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+            padding: 0;
+        }
+
+        .icon-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text);
+        }
+
+        .icon-btn svg {
+            display: block;
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Hide detach button when already detached */
+        body.detached #detach-btn {
+            display: none;
+        }
+
+        #content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            scroll-behavior: smooth;
+        }
+
+        #content::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #content::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        #summary-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* Skeleton loader */
+        .skeleton-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 4px 0;
+        }
+
+        .skeleton-line {
+            height: 13px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--border) 50%, var(--bg-secondary) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.4s ease-in-out infinite;
+        }
+
+        .skeleton-line:nth-child(1) {
+            width: 95%;
+        }
+
+        .skeleton-line:nth-child(2) {
+            width: 82%;
+        }
+
+        .skeleton-line:nth-child(3) {
+            width: 65%;
+        }
+
+        .skeleton-line:nth-child(4) {
+            width: 88%;
+        }
+
+        @keyframes skeleton-shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Status / model loading text */
+        #status-text {
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 20px 0 10px;
+        }
+
+        #status-text:empty {
+            padding: 0;
+        }
+
+        /* Error state */
+        .error-msg {
+            color: #ff453a;
+            font-size: 13px;
+        }
+
+        /* Token/model badge at bottom */
+        footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        #model-badge {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: "SF Mono", "Fira Code", monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        #open-settings {
+            font-size: 11px;
+            color: var(--accent);
+            text-decoration: none;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        #open-settings:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <img class="logo" src="icon48.png" alt="MyGist logo" />
+            <h1>MyGist</h1>
+        </div>
+        <div class="header-actions">
+            <!-- Detach button -->
+            <button class="icon-btn" id="detach-btn" title="Detach to window" aria-label="Detach to window">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M15 3h6v6" />
+                    <path d="M10 14L21 3" />
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                </svg>
+            </button>
+            <!-- Retry button -->
+            <button class="icon-btn" id="retry-btn" title="Retry summary" aria-label="Retry summary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <div id="content">
+        <div id="status-text"></div>
+        <div id="summary-text"></div>
+    </div>
+
+    <footer>
+        <span id="model-badge"></span>
+        <button id="open-settings">Settings</button>
+    </footer>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

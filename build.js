@@ -12,7 +12,7 @@ const outDirFirefox = path.join(__dirname, 'dist', 'firefox');
 });
 
 // Build typescript files
-const tsFiles = ['src/options.ts', 'src/content.ts', 'src/background.ts'];
+const tsFiles = ['src/options.ts', 'src/content.ts', 'src/background.ts', 'src/popup.ts'];
 esbuild.buildSync({
     entryPoints: tsFiles,
     outdir: 'dist/temp',
@@ -36,19 +36,21 @@ iconSizes.forEach(size => {
 });
 
 // Copy assets and dist/temp to both browsers
-const assets = ['src/options.html', 'src/styles.css', 'icon16.png', 'icon32.png', 'icon48.png', 'icon128.png', 'icon16-dark.png', 'icon32-dark.png', 'icon48-dark.png', 'icon128-dark.png'];
+const assets = ['src/options.html', 'src/popup.html', 'src/styles.css', 'icon16.png', 'icon32.png', 'icon48.png', 'icon128.png', 'icon16-dark.png', 'icon32-dark.png', 'icon48-dark.png', 'icon128-dark.png'];
 
 const manifestBase = {
     name: "MyGist",
     version: "1.2.0",
     description: "Summarize webpages privately using your own local LLMs.",
-    permissions: ["storage", "activeTab"],
+    permissions: ["storage", "activeTab", "windows"],
     host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
     options_ui: {
         page: "options.html",
         open_in_tab: true
     },
-    action: {},
+    action: {
+        default_popup: "popup.html"
+    },
     content_scripts: [
         {
             matches: ["<all_urls>"],
@@ -79,6 +81,7 @@ const manifestFirefox = {
     ...manifestBase,
     manifest_version: 2,
     browser_action: {
+        default_popup: "popup.html",
         theme_icons: iconSizes.map(size => ({
             light: `icon${size}-dark.png`,
             dark: `icon${size}.png`,
@@ -110,7 +113,7 @@ fs.writeFileSync(path.join(outDirFirefox, 'manifest.json'), JSON.stringify(manif
 
 // Copy files
 const copyFiles = (srcDir, destDir) => {
-    ['options.js', 'content.js', 'background.js'].forEach(f => {
+    ['options.js', 'content.js', 'background.js', 'popup.js'].forEach(f => {
         fs.copyFileSync(path.join(__dirname, 'dist', 'temp', f), path.join(destDir, f));
     });
     // ['options.js.map', 'content.js.map', 'background.js.map'].forEach(f => {

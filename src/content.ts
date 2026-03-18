@@ -181,7 +181,7 @@ import browser from "webextension-polyfill";
         const textContent = Array.isArray(extracted) ? extracted.join('\n\n') : (typeof extracted === 'string' ? extracted : JSON.stringify(extracted));
 
         try {
-            const port = browser.runtime.connect({ name: 'summary' });
+            const port = browser.runtime.connect({ name:  });
             port.postMessage({ action: 'START_SUMMARY', text: textContent, language: navigator.language });
 
             let hasReceivedMessage = false;
