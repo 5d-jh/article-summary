@@ -57,9 +57,11 @@
             max-height: 560px;
         }
 
-        /* In detached window mode, remove fixed width and allow full height */
-        body.detached {
+        /* In detached window or mobile mode, remove fixed width and allow full height */
+        body.detached,
+        body.mobile {
             width: 100%;
+            max-width: none;
             max-height: none;
             height: 100vh;
         }
@@ -148,10 +150,29 @@
         }
 
         #summary-text {
-            white-space: pre-wrap;
             word-break: break-word;
             color: var(--text);
             line-height: 1.7;
+        }
+
+        #summary-text ul {
+            margin: 0;
+            padding-left: 1.3em;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        #summary-text li {
+            list-style-type: disc;
+        }
+
+        #summary-text p {
+            margin: 0 0 6px;
+        }
+
+        #summary-text p:last-child {
+            margin-bottom: 0;
         }
 
         /* Skeleton loader */

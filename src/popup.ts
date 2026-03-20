@@ -17,6 +17,20 @@ const detachedPageUrl = urlParams.get('url') ? decodeURIComponent(urlParams.get(
 
 if (isDetached) document.body.classList.add('detached');
 
+/**
+ * True on mobile browsers (Firefox for Android, etc.) that do not support
+ * the browser.windows API.  On these platforms we skip all window-detach
+ * logic to avoid silent failures.
+ */
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || typeof (browser as any).windows === 'undefined';
+
+if (isMobile) {
+    document.body.classList.add('mobile');
+    // Hide the detach button on mobile — the feature is not available
+    detachBtn?.style.setProperty('display', 'none');
+}
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -41,9 +55,10 @@ let isDetachingManually = false;
 // ---------------------------------------------------------------------------
 // Auto-detach: when the attached popup is dismissed mid-summary, open a
 // detached window so the user can keep reading the progress.
+// Not supported on mobile (Firefox for Android lacks the windows API).
 // ---------------------------------------------------------------------------
 window.addEventListener('pagehide', () => {
-    if (!isDetached && !isDetachingManually && hasStartedContent && currentPageUrl) {
+    if (!isMobile && !isDetached && !isDetachingManually && hasStartedContent && currentPageUrl) {
         // Fire-and-forget — page is unloading so we cannot await
         browser.runtime.sendMessage({ action: 'OPEN_DETACHED', url: currentPageUrl });
     }
@@ -60,6 +75,8 @@ openSettingsBtn.addEventListener('click', () => {
 // Detach button (manual)
 // ---------------------------------------------------------------------------
 detachBtn.addEventListener('click', async () => {
+    if (isMobile) return; // windows API not available on mobile
+
     isDetachingManually = true; // prevent pagehide from firing a duplicate
 
     const pageUrl = currentPageUrl ?? detachedPageUrl;
@@ -205,7 +222,7 @@ function waitForFirstMessage(port: browser.Runtime.Port): Promise<boolean> {
             }
             // Real session message — attach full listeners and process this message too
             cleanup();
-            const state = { hasFirstChunk: false };
+            const state = { hasFirstChunk: false, textBuffer: '', renderedLineCount: 0, currentUl: null as HTMLUListElement | null };
             port.onMessage.addListener((m: any) => handleMessage(m, port, state));
             port.onDisconnect.addListener(() => {
                 isSummarizing = false;
@@ -227,7 +244,7 @@ function waitForFirstMessage(port: browser.Runtime.Port): Promise<boolean> {
 // Attach the standard streaming listeners to a port
 // ---------------------------------------------------------------------------
 function attachPortListeners(port: browser.Runtime.Port) {
-    const state = { hasFirstChunk: false };
+    const state = { hasFirstChunk: false, textBuffer: '', renderedLineCount: 0, currentUl: null as HTMLUListElement | null };
     port.onMessage.addListener((msg: any) => handleMessage(msg, port, state));
     port.onDisconnect.addListener(() => {
         isSummarizing = false;
@@ -242,7 +259,7 @@ function attachPortListeners(port: browser.Runtime.Port) {
 function handleMessage(
     msg: any,
     port: browser.Runtime.Port,
-    state: { hasFirstChunk: boolean },
+    state: { hasFirstChunk: boolean; textBuffer: string; renderedLineCount: number; currentUl: HTMLUListElement | null },
 ) {
     if (msg.__sentinel) return; // ignore internal sentinels
 
@@ -267,26 +284,37 @@ function handleMessage(
         if (!state.hasFirstChunk) {
             state.hasFirstChunk = true;
             summaryEl.textContent = '';
-            summaryEl.style.whiteSpace = 'pre-wrap';
+            summaryEl.style.whiteSpace = '';
             document.getElementById('skeleton-container')?.remove();
         }
-        const span = document.createElement('span');
-        span.textContent = msg.content;
-        span.style.opacity = '0';
-        span.style.transition = 'opacity 0.15s ease-in';
-        summaryEl.appendChild(span);
-        void span.offsetWidth;
-        span.style.opacity = '1';
+        // Accumulate text for final bullet rendering
+        state.textBuffer += msg.content;
+        
+        const lines = state.textBuffer.split('\n');
+        // Render completed lines incrementally
+        while (state.renderedLineCount < lines.length - 1) {
+            appendDecodedLine(lines[state.renderedLineCount], summaryEl, state);
+            state.renderedLineCount++;
+        }
 
     } else if (msg.type === 'chat.end') {
         statusEl.textContent = '';
-        if (!state.hasFirstChunk && msg.result?.output) {
+        if (state.textBuffer) {
+            // Render the last remaining line
+            const lines = state.textBuffer.split('\n');
+            if (state.renderedLineCount < lines.length) {
+                appendDecodedLine(lines[state.renderedLineCount], summaryEl, state);
+                state.renderedLineCount++;
+            }
+        } else if (!state.hasFirstChunk && msg.result?.output) {
             state.hasFirstChunk = true;
             document.getElementById('skeleton-container')?.remove();
             const messageObj = msg.result.output.find((o: any) => o.type === 'message');
             if (messageObj) {
-                summaryEl.textContent = messageObj.content;
-                summaryEl.style.whiteSpace = 'pre-wrap';
+                const lines = (messageObj.content as string).split('\n');
+                for (const line of lines) {
+                    appendDecodedLine(line, summaryEl, state);
+                }
             }
         }
         isSummarizing = false;
@@ -303,6 +331,35 @@ function handleMessage(
 // ---------------------------------------------------------------------------
 // UI helpers
 // ---------------------------------------------------------------------------
+
+function appendDecodedLine(line: string, container: HTMLElement, state: { currentUl: HTMLUListElement | null }) {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const bulletMatch = line.match(/^\s*[-•*]\s+(.+)$/);
+    let el: HTMLElement;
+
+    if (bulletMatch) {
+        if (!state.currentUl) {
+            state.currentUl = document.createElement('ul');
+            container.appendChild(state.currentUl);
+        }
+        el = document.createElement('li');
+        el.textContent = bulletMatch[1].trim();
+        state.currentUl.appendChild(el);
+    } else {
+        state.currentUl = null;
+        el = document.createElement('p');
+        el.textContent = trimmed;
+        container.appendChild(el);
+    }
+
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.3s ease-in';
+    void el.offsetWidth; // trigger reflow
+    el.style.opacity = '1';
+}
+
 function showSkeleton() {
     if (document.getElementById('skeleton-container')) return;
     const skeleton = document.createElement('div');

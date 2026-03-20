@@ -141,6 +141,23 @@ import browser from "webextension-polyfill";
                     0% { background-position: 200% 0; }
                     100% { background-position: -200% 0; }
                 }
+
+                #ollama-summary-popup-content ul {
+                    margin: 0;
+                    padding-left: 1.3em;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+                #ollama-summary-popup-content li {
+                    list-style-type: disc;
+                }
+                #ollama-summary-popup-content p {
+                    margin: 0 0 6px;
+                }
+                #ollama-summary-popup-content p:last-child {
+                    margin-bottom: 0;
+                }
             `;
             document.head.appendChild(style);
         }
@@ -181,11 +198,13 @@ import browser from "webextension-polyfill";
         const textContent = Array.isArray(extracted) ? extracted.join('\n\n') : (typeof extracted === 'string' ? extracted : JSON.stringify(extracted));
 
         try {
-            const port = browser.runtime.connect({ name:  });
+            const port = browser.runtime.connect();
             port.postMessage({ action: 'START_SUMMARY', text: textContent, language: navigator.language });
 
             let hasReceivedMessage = false;
             let currentModel = '';
+            let textBuffer = '';
+            const state = { renderedLineCount: 0, currentUl: null as HTMLUListElement | null };
 
             port.onMessage.addListener((msg: any) => {
                 if (msg.model_instance_id) {
@@ -209,24 +228,31 @@ import browser from "webextension-polyfill";
                     if (!hasReceivedMessage) {
                         hasReceivedMessage = true;
                         contentBox.innerText = '';
-                        contentBox.style.whiteSpace = 'pre-wrap';
                     }
-                    const span = document.createElement('span');
-                    span.textContent = msg.content;
-                    span.style.opacity = '0';
-                    span.style.transition = 'opacity 0.2s ease-in';
-                    contentBox.appendChild(span);
-
-                    // Trigger reflow to apply transition
-                    void span.offsetWidth;
-                    span.style.opacity = '1';
+                    // Accumulate for final bullet rendering
+                    textBuffer += msg.content;
+                    
+                    const lines = textBuffer.split('\n');
+                    while (state.renderedLineCount < lines.length - 1) {
+                        appendDecodedLine(lines[state.renderedLineCount], contentBox, state);
+                        state.renderedLineCount++;
+                    }
                 } else if (msg.type === 'chat.end') {
-                    if (!hasReceivedMessage) {
+                    if (textBuffer) {
+                        const lines = textBuffer.split('\n');
+                        if (state.renderedLineCount < lines.length) {
+                            appendDecodedLine(lines[state.renderedLineCount], contentBox, state);
+                            state.renderedLineCount++;
+                        }
+                    } else if (!hasReceivedMessage) {
                         hasReceivedMessage = true;
                         if (msg.result?.output) {
                             const messageObj = msg.result.output.find((o: any) => o.type === 'message');
                             if (messageObj) {
-                                contentBox.innerText = messageObj.content;
+                                const lines = (messageObj.content as string).split('\n');
+                                for (const line of lines) {
+                                    appendDecodedLine(line, contentBox, state);
+                                }
                             }
                         }
                     }
@@ -247,6 +273,34 @@ import browser from "webextension-polyfill";
         } catch (err: any) {
             contentBox.innerHTML = `<strong>Error:</strong><br> ${err.message}`;
         }
+    }
+
+    function appendDecodedLine(line: string, container: HTMLElement, state: { currentUl: HTMLUListElement | null }) {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        const bulletMatch = line.match(/^\s*[-•*]\s+(.+)$/);
+        let el: HTMLElement;
+
+        if (bulletMatch) {
+            if (!state.currentUl) {
+                state.currentUl = document.createElement('ul');
+                container.appendChild(state.currentUl);
+            }
+            el = document.createElement('li');
+            el.textContent = bulletMatch[1].trim();
+            state.currentUl.appendChild(el);
+        } else {
+            state.currentUl = null;
+            el = document.createElement('p');
+            el.textContent = trimmed;
+            container.appendChild(el);
+        }
+
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.2s ease-in';
+        void el.offsetWidth;
+        el.style.opacity = '1';
     }
 
     function scrollToRef(id: string) {

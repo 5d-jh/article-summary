@@ -23,14 +23,16 @@ const sessions = new Map<string, SummarySession>();
 /** pageUrl → windowId of the currently open detached popup */
 const detachedWindows = new Map<string, number>();
 
-browser.windows.onRemoved.addListener((windowId: number) => {
-    for (const [url, wId] of detachedWindows) {
-        if (wId === windowId) {
-            detachedWindows.delete(url);
-            break;
+if (browser?.windows?.onRemoved) {
+    browser.windows.onRemoved.addListener((windowId: number) => {
+        for (const [url, wId] of detachedWindows) {
+            if (wId === windowId) {
+                detachedWindows.delete(url);
+                break;
+            }
         }
-    }
-});
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Dynamic icon switching (dark / light mode)
@@ -64,6 +66,9 @@ try {
 // ---------------------------------------------------------------------------
 browser.runtime.onMessage.addListener(async (msg: any) => {
     if (msg.action === 'OPEN_DETACHED' && msg.url) {
+        // Firefox for Android does not support the windows API — bail out silently
+        if (typeof browser.windows === 'undefined') return;
+
         const pageUrl: string = msg.url;
 
         // If a detached window for this URL is already open, just focus it
@@ -181,7 +186,7 @@ async function handleStreamSummary(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: (settings.lmstudioModel as string) || 'google/gemma-3-4b',
-                system_prompt: `A message from supreme administrator: Create a concise summary of the user's text in ${langName}. Only answer the summary, preferably around 4 lines. Do not include any other text.`,
+                system_prompt: `A message from supreme administrator: Create a concise summary of the user's text in ${langName}. Only answer the summary, preferably around 4 lines, bullet-pointed. Do not include any other text.`,
                 input: textContent,
                 temperature: 0.8,
                 stream: true,
