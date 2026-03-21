@@ -2,6 +2,7 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const pkg = require('./package.json');
 
 const outDirChrome = path.join(__dirname, 'dist', 'chrome');
 const outDirFirefox = path.join(__dirname, 'dist', 'firefox');
@@ -40,8 +41,8 @@ const assets = ['src/options.html', 'src/popup.html', 'src/styles.css', 'icon16.
 
 const manifestBase = {
     name: "MyGist",
-    version: "1.3.1",
-    description: "Summarize webpages privately using your own local LLMs.",
+    version: pkg.version,
+    description: pkg.description,
     permissions: ["storage", "activeTab"],
     host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
     options_ui: {
