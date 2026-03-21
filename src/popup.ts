@@ -289,9 +289,7 @@ function handleMessage(
         statusEl.textContent = '';
         if (!state.hasFirstChunk) {
             state.hasFirstChunk = true;
-            summaryEl.textContent = '';
             summaryEl.style.whiteSpace = '';
-            document.getElementById('skeleton-container')?.remove();
         }
         // Accumulate text for final bullet rendering
         state.textBuffer += msg.content;
@@ -323,6 +321,7 @@ function handleMessage(
                 }
             }
         }
+        document.getElementById('skeleton-container')?.remove();
         isSummarizing = false;
         currentPort = null;
         hasStartedContent = false; // summary complete — disable auto-detach
@@ -349,7 +348,16 @@ function appendDecodedLine(line: string, container: HTMLElement, state: { curren
 
     el.style.opacity = '0';
     el.style.transition = 'opacity 0.3s ease-in';
-    container.appendChild(el);
+
+    const skeleton = document.getElementById('skeleton-container');
+    if (skeleton) {
+        container.insertBefore(el, skeleton);
+        if (skeleton.children.length > 1) {
+            skeleton.lastElementChild?.remove();
+        }
+    } else {
+        container.appendChild(el);
+    }
 
     void el.offsetWidth; // trigger reflow
     el.style.opacity = '1';
@@ -360,7 +368,7 @@ function showSkeleton() {
     const skeleton = document.createElement('div');
     skeleton.id = 'skeleton-container';
     skeleton.className = 'skeleton-wrap';
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
         const line = document.createElement('div');
         line.className = 'skeleton-line';
         skeleton.appendChild(line);
