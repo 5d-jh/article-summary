@@ -4,6 +4,15 @@ const path = require('path');
 const pkg = require('./package.json');
 const sharp = require('sharp');
 
+// Parse command line arguments for version
+const args = process.argv.slice(2);
+let argVersion = null;
+const vIndex = args.indexOf('-v');
+if (vIndex !== -1 && args[vIndex + 1]) {
+    argVersion = args[vIndex + 1];
+}
+const finalVersion = argVersion || pkg.version;
+
 const outDirChrome = path.join(__dirname, 'dist', 'chrome');
 const outDirFirefox = path.join(__dirname, 'dist', 'firefox');
 
@@ -42,8 +51,8 @@ async function build() {
 
     const manifestBase = {
         name: "MyGist",
-        version: pkg.version,
-        description: pkg.description,
+        version: finalVersion,
+        description: "Summarize webpages privately using your own local LLMs.",
         permissions: ["storage", "activeTab"],
         host_permissions: ["http://*/*", "https://*/*", "<all_urls>"],
         options_ui: {
