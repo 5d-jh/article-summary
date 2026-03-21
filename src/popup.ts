@@ -54,18 +54,6 @@ let hasStartedContent = false;
 let isDetachingManually = false;
 
 // ---------------------------------------------------------------------------
-// Auto-detach: when the attached popup is dismissed mid-summary, open a
-// detached window so the user can keep reading the progress.
-// Not supported on mobile (Firefox for Android lacks the windows API).
-// ---------------------------------------------------------------------------
-window.addEventListener('pagehide', () => {
-    if (!isMobile && !isDetached && !isDetachingManually && hasStartedContent && currentPageUrl) {
-        // Fire-and-forget — page is unloading so we cannot await
-        browser.runtime.sendMessage({ action: 'OPEN_DETACHED', url: currentPageUrl });
-    }
-});
-
-// ---------------------------------------------------------------------------
 // Settings button
 // ---------------------------------------------------------------------------
 openSettingsBtn.addEventListener('click', () => {
