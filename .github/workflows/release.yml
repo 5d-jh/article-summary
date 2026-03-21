@@ -51,6 +51,5 @@ jobs:
           files: |
             dist/chrome.zip
             dist/firefox.zip
-            dist/source.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

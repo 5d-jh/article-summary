@@ -10,7 +10,7 @@
     "zip:firefox": "cd dist/firefox && zip -r ../firefox.zip ./*",
     "zip:chrome": "cd dist/chrome && zip -r ../chrome.zip ./*",
     "zip:source": "zip -r ./dist/source.zip ./* -x \"node_modules/*\" -x \"dist/*\" -x \".git/*\" -x \"source.zip\"",
-    "release": "pnpm run build:prod && pnpm run zip:firefox && pnpm run zip:chrome && pnpm run zip:source"
+    "release": "pnpm run build:prod && pnpm run zip:firefox && pnpm run zip:chrome"
   },
   "keywords": [],
   "author": "",
