@@ -11,6 +11,10 @@ const vIndex = args.indexOf('-v');
 if (vIndex !== -1 && args[vIndex + 1]) {
     argVersion = args[vIndex + 1];
 }
+if (argVersion.startsWith('v')) {
+    argVersion = argVersion.slice(1);
+}
+
 const finalVersion = argVersion || pkg.version;
 
 const outDirChrome = path.join(__dirname, 'dist', 'chrome');
