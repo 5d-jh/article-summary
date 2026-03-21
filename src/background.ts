@@ -111,7 +111,11 @@ browser.runtime.onConnect.addListener(port => {
     port.onMessage.addListener(async (msg: any) => {
         if (msg.action !== 'START_SUMMARY') return;
 
-        const sessionKey: string | undefined = msg.url; // page URL as session key
+        const sessionKey: string | undefined = msg.url || port.sender?.tab?.url; // page URL as session key
+
+        if (msg.forceNew && sessionKey) {
+            sessions.delete(sessionKey);
+        }
 
         // ---- Session reuse ----
         if (sessionKey && sessions.has(sessionKey)) {
@@ -139,7 +143,7 @@ browser.runtime.onConnect.addListener(port => {
         }
 
         // ---- New session ----
-        await handleStreamSummary(msg.text, msg.language || 'en', port, sessionKey);
+        await handleStreamSummary(msg.text, msg.language || 'en', port, sessionKey, msg.title);
     });
 });
 
@@ -151,6 +155,7 @@ async function handleStreamSummary(
     language: string,
     port: browser.Runtime.Port,
     sessionKey?: string,
+    title?: string,
 ) {
     // Create a session so other ports (detached window) can join mid-stream
     let session: SummarySession | undefined;
@@ -181,12 +186,19 @@ async function handleStreamSummary(
 
         const langName = new Intl.DisplayNames(['en'], { type: 'language' }).of(language) || language;
 
+        let websiteHost = '';
+        if (sessionKey) {
+            try { websiteHost = new URL(sessionKey).hostname; } catch { }
+        }
+        const hostContext = websiteHost ? websiteHost + '. ' : '';
+        const titleContext = title ? `The title of the page is "${title}". ` : '';
+
         const res = await fetch(new URL('/api/v1/chat', host), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: (settings.lmstudioModel as string) || 'google/gemma-3-4b',
-                system_prompt: `A message from supreme administrator: Create a concise summary of the user's text in ${langName}. Only answer the summary, preferably around 4 lines, bullet-pointed. Do not include any other text.`,
+                system_prompt: `A message from supreme administrator: This website is ${hostContext}${titleContext}Create a concise summary of the user's text in ${langName}. Only answer the summary, preferably around 4 lines, bullet-pointed. Do not include any other text.`,
                 input: textContent,
                 temperature: 0.8,
                 stream: true,

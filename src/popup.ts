@@ -1,17 +1,18 @@
 import browser from "webextension-polyfill";
+import { parse } from "marked";
 
-const statusEl       = document.getElementById('status-text')  as HTMLDivElement;
-const summaryEl      = document.getElementById('summary-text') as HTMLDivElement;
-const modelBadgeEl   = document.getElementById('model-badge')  as HTMLSpanElement;
-const detachBtn      = document.getElementById('detach-btn')   as HTMLButtonElement;
-const retryBtn       = document.getElementById('retry-btn')    as HTMLButtonElement;
+const statusEl = document.getElementById('status-text') as HTMLDivElement;
+const summaryEl = document.getElementById('summary-text') as HTMLDivElement;
+const modelBadgeEl = document.getElementById('model-badge') as HTMLSpanElement;
+const detachBtn = document.getElementById('detach-btn') as HTMLButtonElement;
+const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
 const openSettingsBtn = document.getElementById('open-settings') as HTMLButtonElement;
 
 // ---------------------------------------------------------------------------
 // Determine context (attached popup vs. detached window)
 // ---------------------------------------------------------------------------
-const urlParams      = new URLSearchParams(window.location.search);
-const isDetached     = urlParams.get('detached') === '1';
+const urlParams = new URLSearchParams(window.location.search);
+const isDetached = urlParams.get('detached') === '1';
 /** Page URL passed via query param when opening a detached window */
 const detachedPageUrl = urlParams.get('url') ? decodeURIComponent(urlParams.get('url')!) : null;
 
@@ -113,16 +114,19 @@ async function startSummary(forceNew = false) {
     // ---------------------------------------------------------------------------
     // Resolve tab and page URL
     // ---------------------------------------------------------------------------
+    let currentPageTitle: string | null = null;
     if (detachedPageUrl) {
         // Detached mode: find an open tab with the target URL
         currentPageUrl = detachedPageUrl;
         const tabs = await browser.tabs.query({ url: detachedPageUrl });
         currentTabId = tabs[0]?.id ?? null;
+        currentPageTitle = tabs[0]?.title ?? null;
     } else {
         // Attached popup: use the active tab
         const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
         currentTabId = activeTab?.id ?? null;
         currentPageUrl = activeTab?.url ?? null;
+        currentPageTitle = activeTab?.title ?? null;
     }
 
     if (!currentPageUrl) {
@@ -195,6 +199,8 @@ async function startSummary(forceNew = false) {
             text: textContent,
             language: navigator.language,
             url: currentPageUrl,
+            title: currentPageTitle,
+            forceNew: true,
         });
         attachPortListeners(port);
     } catch (err: any) {
@@ -289,7 +295,7 @@ function handleMessage(
         }
         // Accumulate text for final bullet rendering
         state.textBuffer += msg.content;
-        
+
         const lines = state.textBuffer.split('\n');
         // Render completed lines incrementally
         while (state.renderedLineCount < lines.length - 1) {
@@ -336,26 +342,15 @@ function appendDecodedLine(line: string, container: HTMLElement, state: { curren
     const trimmed = line.trim();
     if (!trimmed) return;
 
-    const bulletMatch = line.match(/^\s*[-•*]\s+(.+)$/);
-    let el: HTMLElement;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = parse(line, { async: false }).trim();
 
-    if (bulletMatch) {
-        if (!state.currentUl) {
-            state.currentUl = document.createElement('ul');
-            container.appendChild(state.currentUl);
-        }
-        el = document.createElement('li');
-        el.textContent = bulletMatch[1].trim();
-        state.currentUl.appendChild(el);
-    } else {
-        state.currentUl = null;
-        el = document.createElement('p');
-        el.textContent = trimmed;
-        container.appendChild(el);
-    }
+    const el = wrapper.children.length === 1 ? (wrapper.firstElementChild as HTMLElement) : wrapper;
 
     el.style.opacity = '0';
     el.style.transition = 'opacity 0.3s ease-in';
+    container.appendChild(el);
+
     void el.offsetWidth; // trigger reflow
     el.style.opacity = '1';
 }

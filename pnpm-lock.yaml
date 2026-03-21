@@ -11,6 +11,9 @@ importers:
       '@types/chrome':
         specifier: ^0.1.37
         version: 0.1.37
+      '@types/marked':
+        specifier: ^6.0.0
+        version: 6.0.0
       '@types/node':
         specifier: ^25.3.2
         version: 25.3.2
@@ -20,6 +23,9 @@ importers:
       esbuild:
         specifier: ^0.27.3
         version: 0.27.3
+      marked:
+        specifier: ^17.0.5
+        version: 17.0.5
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -197,6 +203,10 @@ packages:
   '@types/har-format@1.2.16':
     resolution: {integrity: sha512-fluxdy7ryD3MV6h8pTfTYpy/xQzCFC7m89nOH9y94cNqJ1mDIDPut7MnRHI3F6qRmh/cT2fUjG1MLdCNb4hE9A==}
 
+  '@types/marked@6.0.0':
+    resolution: {integrity: sha512-jmjpa4BwUsmhxcfsgUit/7A9KbrC48Q0q8KvnY107ogcjGgTFDlIL3RpihNpx2Mu1hM4mdFQjoVc4O6JoGKHsA==}
+    deprecated: This is a stub types definition. marked provides its own type definitions, so you do not need this installed.
+
   '@types/node@25.3.2':
     resolution: {integrity: sha512-RpV6r/ij22zRRdyBPcxDeKAzH43phWVKEjL2iksqo1Vz3CuBUrgmPpPhALKiRfU7OMCmeeO9vECBMsV0hMTG8Q==}
 
@@ -206,6 +216,11 @@ packages:
   esbuild@0.27.3:
     resolution: {integrity: sha512-8VwMnyGCONIs6cWue2IdpHxHnAjzxnw2Zr7MkVxB2vjmQ2ivqGFb4LEG3SMnv0Gb2F/G/2yA8zUaiL1gywDCCg==}
     engines: {node: '>=18'}
+    hasBin: true
+
+  marked@17.0.5:
+    resolution: {integrity: sha512-6hLvc0/JEbRjRgzI6wnT2P1XuM1/RrrDEX0kPt0N7jGm1133g6X7DlxFasUIx+72aKAr904GTxhSLDrd5DIlZg==}
+    engines: {node: '>= 20'}
     hasBin: true
 
   typescript@5.9.3:
@@ -312,6 +327,10 @@ snapshots:
 
   '@types/har-format@1.2.16': {}
 
+  '@types/marked@6.0.0':
+    dependencies:
+      marked: 17.0.5
+
   '@types/node@25.3.2':
     dependencies:
       undici-types: 7.18.2
@@ -346,6 +365,8 @@ snapshots:
       '@esbuild/win32-arm64': 0.27.3
       '@esbuild/win32-ia32': 0.27.3
       '@esbuild/win32-x64': 0.27.3
+
+  marked@17.0.5: {}
 
   typescript@5.9.3: {}
 
